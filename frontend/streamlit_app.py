@@ -13,7 +13,6 @@ st.set_page_config(
 )
 
 # Backend URL configuration
-# Backend URL configuration
 try:
     BACKEND_URL = st.secrets["BACKEND_URL"]
 except (KeyError, FileNotFoundError):
