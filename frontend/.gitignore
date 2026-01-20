@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+venv/
+env/
+backend/serviceAccountKey.json
+frontend/.streamlit/secrets.toml
+backend/.env
+.DS_Store

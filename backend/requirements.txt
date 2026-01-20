@@ -1,0 +1,73 @@
+Flask==2.3.3
+flask-cors==4.0.0
+firebase-admin==6.2.0
+rapidfuzz==3.2.0
+gunicorn==21.2.0
+python-dateutil==2.8.2
+
+# # Core Flask dependencies
+# Flask==2.3.3
+# flask-cors==4.0.0
+# Werkzeug==2.3.7
+
+# # Firebase
+# firebase-admin==6.2.0
+
+# # NLP and Text Processing
+# transformers==4.33.2
+# torch==2.5.1    
+# rapidfuzz==3.2.0
+# word2number==1.1
+
+# # Optional NLP (comment out if causing issues)
+# # spacy==3.6.1
+
+# # Utilities
+# python-dotenv==1.0.0
+# requests==2.31.0
+
+# # Production server
+# gunicorn==21.2.0
+
+# # Frontend (if using Streamlit)
+# streamlit==1.26.0
+
+# # Development and testing
+# pytest==7.4.2
+# pytest-flask==1.2.0
+
+# # Data processing
+# pandas==2.0.3
+# numpy==1.24.3
+
+# # Logging and monitoring
+# python-json-logger==2.0.7
+
+# # Date and time utilities
+# python-dateutil==2.8.2
+
+# # Environment and config
+# pydantic==2.3.0
+
+# # HTTP client for testing
+# httpx==0.24.1
+
+# # Optional: For better regex support
+# regex==2023.8.8
+
+# # Optional: For advanced text processing
+# nltk==3.8.1
+
+# # Optional: For caching (if needed)
+# # redis==4.6.0
+
+# # Optional: For database operations
+# # sqlalchemy==2.0.20
+
+# # Development tools (comment out for production)
+# black==23.7.0
+# flake8==6.0.0
+# mypy==1.5.1
+
+# # Security
+# cryptography==41.0.4
