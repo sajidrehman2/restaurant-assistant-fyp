@@ -1014,13 +1014,10 @@ def main():
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Configuration")
-    backend_url = st.sidebar.text_input("Backend URL:", value=BACKEND_URL)
-    
-    if backend_url != BACKEND_URL:
-        globals()['BACKEND_URL'] = backend_url.rstrip('/')
-    
+    # Display backend URL as read-only info
+    st.sidebar.code(f"Backend: {BACKEND_URL}", language="text")
     st.sidebar.markdown("---")
-    st.sidebar.subheader("⚡ Quick Actions")
+    st.sidebar.subheader("⚡ Quick Actions")  # ← FIXED!
     
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
         st.session_state.clear()
