@@ -16,8 +16,7 @@ st.set_page_config(
 try:
     BACKEND_URL = st.secrets["BACKEND_URL"]
 except (KeyError, FileNotFoundError):
-    BACKEND_URL = "https://restaurant-assistant-fyp.onrender.com"
-
+    BACKEND_URL = "https://restaurant-assistant-fyp.onrender.com"  # ← Make sure this line is correct
 # Initialize theme in session state
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
