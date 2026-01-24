@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Backend URL configuration - FIXED
+# Backend URL configuration
 BACKEND_URL = "https://restaurant-assistant-fyp.onrender.com"
 
 # Optional: Allow override via secrets
@@ -20,9 +20,8 @@ try:
     if "BACKEND_URL" in st.secrets:
         BACKEND_URL = st.secrets["BACKEND_URL"]
 except Exception:
-    pass  # Use default URL
+    pass
 
-st.write(f"🔗 Connecting to backend: {BACKEND_URL}")  # Debug line - remove later
 # Initialize theme in session state
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
@@ -622,41 +621,62 @@ theme_class = f"theme-{st.session_state.theme}"
 st.markdown(f'<div class="{theme_class}">', unsafe_allow_html=True)
 
 def make_request(endpoint, method="GET", data=None):
-    """Make HTTP request to backend API"""
+    """Make HTTP request to backend API with improved error handling"""
     try:
         url = f"{BACKEND_URL}/{endpoint.lstrip('/')}"
         
+        # Make the request based on method
         if method == "GET":
-            response = requests.get(url, timeout=60)
+            response = requests.get(url, timeout=30)
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=60)
+            response = requests.post(url, json=data, timeout=30)
         elif method == "PUT":
-            response = requests.put(url, json=data, timeout=60)
+            response = requests.put(url, json=data, timeout=30)
         else:
             st.error(f"Unsupported HTTP method: {method}")
             return None
         
-        return response.json()
+        # Check HTTP status
+        response.raise_for_status()
+        
+        # Try to parse JSON
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            st.error(f"❌ Backend returned invalid JSON")
+            st.error(f"Status Code: {response.status_code}")
+            with st.expander("View Response Details"):
+                st.code(response.text[:1000])  # Show first 1000 chars
+            return None
     
-    except requests.exceptions.ConnectionError:
-        st.error(f"Cannot connect to backend at {BACKEND_URL}")
-        st.info("Make sure the backend server is running and the URL is correct.")
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
+        st.info("🔄 The backend server might be starting up (cold start). Please wait 30-60 seconds and try again.")
+        with st.expander("Connection Details"):
+            st.code(str(e))
         return None
+    
     except requests.exceptions.Timeout:
-        st.error("Request timed out")
+        st.error("⏱️ Request timed out - backend is slow to respond")
+        st.info("💡 Free tier backends can take 30+ seconds to wake up. Please try again.")
         return None
+    
+    except requests.exceptions.HTTPError as e:
+        st.error(f"❌ HTTP Error {e.response.status_code}")
+        with st.expander("Error Details"):
+            st.code(e.response.text[:1000])
+        return None
+    
     except requests.exceptions.RequestException as e:
-        st.error(f"Request failed: {str(e)}")
-        return None
-    except json.JSONDecodeError:
-        st.error("Invalid response from server")
+        st.error(f"❌ Request failed: {str(e)}")
         return None
 
 def display_menu():
     """Display the restaurant menu"""
     st.markdown("## <span class='icon'>🍽️</span> Our Menu", unsafe_allow_html=True)
     
-    menu_data = make_request("menu")
+    with st.spinner("Loading menu..."):
+        menu_data = make_request("menu")
     
     if menu_data and menu_data.get("success"):
         menu_items = menu_data.get("menu", [])
@@ -697,13 +717,14 @@ def display_menu():
                         st.session_state.page = "💬 Chat & Order"
                         st.rerun()
     else:
-        st.error("Failed to load menu. Please try again later.")
+        st.warning("⚠️ Could not load menu. Please check the System Status page or try again later.")
 
 def display_orders():
     """Display order history"""
     st.markdown("## <span class='icon'>📋</span> Order History", unsafe_allow_html=True)
     
-    orders_data = make_request("orders?limit=20")
+    with st.spinner("Loading orders..."):
+        orders_data = make_request("orders?limit=20")
     
     if orders_data and orders_data.get("success"):
         orders = orders_data.get("orders", [])
@@ -768,7 +789,7 @@ def display_orders():
                         else:
                             st.error("Failed to update status")
     else:
-        st.error("Failed to load orders. Please try again later.")
+        st.warning("⚠️ Could not load orders. Please check the System Status page or try again later.")
 
 def chat_interface():
     """Main chat interface for placing orders"""
@@ -779,27 +800,23 @@ def chat_interface():
             {"role": "assistant", "content": "Hello! Welcome to Sajid SmartDine. You can order food by saying something like 'I want 2 pizzas and 1 coke' or ask me to 'show menu' to see available items."}
         ]
     
-    # Handle quick order from menu - FIXED VERSION
+    # Handle quick order from menu
     if "quick_order" in st.session_state and st.session_state.quick_order:
         quick_item = st.session_state.quick_order
         user_message = f"I want 1 {quick_item}"
         
-        # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": user_message})
         
-        # Process the order with loading indicator
         with st.spinner("Processing your quick order..."):
             order_data = {"message": user_message}
             result = make_request("order", "POST", order_data)
             
             if result:
                 if result.get("success"):
-                    # Check if it's an order
                     if result.get("intent") == "order_food" and result.get("order"):
                         order = result["order"]
                         response = result.get("response", "Order processed successfully!")
                         
-                        # Create detailed response message
                         detailed_response = f"{response}\n\n"
                         detailed_response += f"📦 **Order Details:**\n"
                         detailed_response += f"🎫 Order ID: `{order.get('order_id')}`\n"
@@ -809,7 +826,6 @@ def chat_interface():
                         for item in order.get('items', []):
                             detailed_response += f"  • {item['quantity']}x {item['name']} @ PKR {item['unit_price']} = PKR {item['total_price']}\n"
                         
-                        # Add the detailed response to messages
                         st.session_state.messages.append({"role": "assistant", "content": detailed_response})
                     else:
                         response = result.get("response", "Thank you for your message!")
@@ -818,10 +834,9 @@ def chat_interface():
                     error_msg = f"Sorry, I couldn't process that: {result.get('error', 'Unknown error')}"
                     st.session_state.messages.append({"role": "assistant", "content": error_msg})
             else:
-                error_msg = "Sorry, I'm having trouble connecting right now. Please try again."
+                error_msg = "Sorry, I'm having trouble connecting right now. Please try again in a moment."
                 st.session_state.messages.append({"role": "assistant", "content": error_msg})
         
-        # Clear the quick order flag and rerun
         st.session_state.quick_order = None
         st.rerun()
     
@@ -841,7 +856,7 @@ def chat_interface():
             st.markdown(f'<div class="chat-user">{prompt}</div>', unsafe_allow_html=True)
         
         with st.chat_message("assistant"):
-            with st.spinner("Processing your order..."):
+            with st.spinner("Processing your request..."):
                 order_data = {"message": prompt}
                 result = make_request("order", "POST", order_data)
                 response = ""
@@ -881,8 +896,8 @@ def chat_interface():
                         st.error(error_msg)
                         response = error_msg
                 else:
-                    response = "Sorry, I'm having trouble connecting right now. Please try again."
-                    st.error(response)
+                    response = "Sorry, I'm having trouble connecting right now. Please wait a moment and try again."
+                    st.warning(response)
                 
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
@@ -890,10 +905,11 @@ def system_status():
     """Display system status and health"""
     st.markdown("## <span class='icon'>🔧</span> System Status", unsafe_allow_html=True)
     
-    health_data = make_request("health")
+    with st.spinner("Checking backend health..."):
+        health_data = make_request("health")
     
     if health_data:
-        st.success("Backend is running")
+        st.success("✅ Backend is running")
         
         col1, col2 = st.columns(2)
         
@@ -912,7 +928,8 @@ def system_status():
                     pass
             st.markdown(f"**⏰ Last Check:** {timestamp}")
     else:
-        st.error("Backend is not responding")
+        st.error("❌ Backend is not responding")
+        st.warning("The backend may be in a cold start (free tier limitation). Please wait 30-60 seconds and refresh.")
         st.info(f"Backend URL: {BACKEND_URL}")
     
     st.markdown("### ⚙️ Configuration")
@@ -920,11 +937,12 @@ def system_status():
     
     st.markdown("### 📊 Statistics")
     
-    menu_data = make_request("menu")
-    menu_count = len(menu_data.get("menu", [])) if menu_data and menu_data.get("success") else 0
-    
-    orders_data = make_request("orders?limit=1000")
-    orders_count = len(orders_data.get("orders", [])) if orders_data and orders_data.get("success") else 0
+    with st.spinner("Loading statistics..."):
+        menu_data = make_request("menu")
+        menu_count = len(menu_data.get("menu", [])) if menu_data and menu_data.get("success") else 0
+        
+        orders_data = make_request("orders?limit=1000")
+        orders_count = len(orders_data.get("orders", [])) if orders_data and orders_data.get("success") else 0
     
     col1, col2, col3 = st.columns(3)
     
@@ -956,7 +974,6 @@ def system_status():
 def main():
     """Main application"""
     
-    # Initialize page state
     if "page" not in st.session_state:
         st.session_state.page = "💬 Chat & Order"
     
@@ -974,7 +991,7 @@ def main():
         </div>
         <div class="status-indicator">
             <div class="status-dot"></div>
-            <span>{'Online' if is_online else 'Offline'}</span>
+            <span>{'Online' if is_online else 'Starting...' if not is_online else 'Offline'}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1002,7 +1019,6 @@ def main():
         label_visibility="collapsed"
     )
     
-    # Update page state
     st.session_state.page = page
     
     st.sidebar.markdown("---")
@@ -1020,10 +1036,10 @@ def main():
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Configuration")
-    # Display backend URL as read-only info
     st.sidebar.code(f"Backend: {BACKEND_URL}", language="text")
+    
     st.sidebar.markdown("---")
-    st.sidebar.subheader("⚡ Quick Actions")  # ← FIXED!
+    st.sidebar.subheader("⚡ Quick Actions")
     
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
         st.session_state.clear()
