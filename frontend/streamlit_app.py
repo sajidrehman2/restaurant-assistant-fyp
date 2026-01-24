@@ -613,6 +613,139 @@ st.markdown("""
     .streamlit-expanderHeader:hover {
         background: rgba(102, 126, 234, 0.2);
     }
+    
+    /* Mobile Responsive Design */
+    @media screen and (max-width: 768px) {
+        /* Header adjustments */
+        .premium-header {
+            padding: 1.5rem;
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .header-content {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .header-logo {
+            font-size: 2em;
+        }
+        
+        .header-text h1 {
+            font-size: 1.5em;
+        }
+        
+        .header-text p {
+            font-size: 0.9em;
+        }
+        
+        .status-indicator {
+            margin-top: 1rem;
+        }
+        
+        /* Menu items - single column on mobile */
+        .menu-item {
+            padding: 1.2rem;
+            margin: 0.8rem 0;
+        }
+        
+        .menu-item h4 {
+            font-size: 1.1em;
+        }
+        
+        .menu-item p {
+            font-size: 0.9em;
+        }
+        
+        .price-tag {
+            font-size: 1em;
+            padding: 0.5rem 1.2rem;
+        }
+        
+        /* Chat messages */
+        .chat-user, .chat-bot {
+            padding: 0.8rem 1rem;
+            font-size: 0.9em;
+        }
+        
+        /* Metric cards - stack on mobile */
+        .metric-card {
+            padding: 1.5rem;
+            margin: 0.8rem 0;
+        }
+        
+        .metric-value {
+            font-size: 2.5em;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+        }
+        
+        /* Buttons */
+        .stButton > button {
+            padding: 0.7rem 1.5rem;
+            font-size: 0.9em;
+        }
+        
+        /* Order cards */
+        .order-card {
+            padding: 1.2rem;
+        }
+        
+        .order-item {
+            padding: 0.8rem 1rem;
+            font-size: 0.9em;
+        }
+        
+        /* Theme toggle button */
+        .theme-toggle {
+            bottom: 1rem;
+            right: 1rem;
+            width: 50px;
+            height: 50px;
+            font-size: 1.2em;
+        }
+        
+        /* Footer */
+        .footer {
+            font-size: 0.8em;
+            padding: 1.5rem 1rem;
+        }
+        
+        /* Status badges */
+        .status-badge {
+            font-size: 0.8em;
+            padding: 0.5rem 1rem;
+        }
+        
+        /* Input fields */
+        .stTextInput > div > div > input,
+        .stChatInput > div > input {
+            font-size: 0.9em;
+            padding: 0.7rem 1.2rem;
+        }
+    }
+    
+    /* Extra small mobile devices */
+    @media screen and (max-width: 480px) {
+        .header-text h1 {
+            font-size: 1.3em;
+        }
+        
+        .header-logo {
+            font-size: 1.8em;
+        }
+        
+        .menu-item {
+            padding: 1rem;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
