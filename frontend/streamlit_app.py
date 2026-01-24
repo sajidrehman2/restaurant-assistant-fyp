@@ -12,11 +12,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Backend URL configuration
+# Backend URL configuration - FIXED
+BACKEND_URL = "https://restaurant-assistant-fyp.onrender.com"
+
+# Optional: Allow override via secrets
 try:
-    BACKEND_URL = st.secrets["BACKEND_URL"]
-except (KeyError, FileNotFoundError):
-    BACKEND_URL = "https://restaurant-assistant-fyp.onrender.com"  # ← Make sure this line is correct
+    if "BACKEND_URL" in st.secrets:
+        BACKEND_URL = st.secrets["BACKEND_URL"]
+except Exception:
+    pass  # Use default URL
+
+st.write(f"🔗 Connecting to backend: {BACKEND_URL}")  # Debug line - remove later
 # Initialize theme in session state
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
@@ -621,11 +627,11 @@ def make_request(endpoint, method="GET", data=None):
         url = f"{BACKEND_URL}/{endpoint.lstrip('/')}"
         
         if method == "GET":
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=60)
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, timeout=60)
         elif method == "PUT":
-            response = requests.put(url, json=data, timeout=10)
+            response = requests.put(url, json=data, timeout=60)
         else:
             st.error(f"Unsupported HTTP method: {method}")
             return None
