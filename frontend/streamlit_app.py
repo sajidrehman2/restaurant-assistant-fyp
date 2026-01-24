@@ -620,56 +620,65 @@ st.markdown("""
 theme_class = f"theme-{st.session_state.theme}"
 st.markdown(f'<div class="{theme_class}">', unsafe_allow_html=True)
 
-def make_request(endpoint, method="GET", data=None):
-    """Make HTTP request to backend API with improved error handling"""
-    try:
-        url = f"{BACKEND_URL}/{endpoint.lstrip('/')}"
-        
-        # Make the request based on method
-        if method == "GET":
-            response = requests.get(url, timeout=30)
-        elif method == "POST":
-            response = requests.post(url, json=data, timeout=30)
-        elif method == "PUT":
-            response = requests.put(url, json=data, timeout=30)
-        else:
-            st.error(f"Unsupported HTTP method: {method}")
-            return None
-        
-        # Check HTTP status
-        response.raise_for_status()
-        
-        # Try to parse JSON
+def make_request(endpoint, method="GET", data=None, max_retries=2):
+    """Make HTTP request to backend API with improved error handling and retries"""
+    url = f"{BACKEND_URL}/{endpoint.lstrip('/')}"
+    
+    for attempt in range(max_retries):
         try:
-            return response.json()
-        except json.JSONDecodeError:
-            st.error(f"❌ Backend returned invalid JSON")
-            st.error(f"Status Code: {response.status_code}")
-            with st.expander("View Response Details"):
-                st.code(response.text[:1000])  # Show first 1000 chars
+            # Longer timeout for free tier backends (90 seconds)
+            if method == "GET":
+                response = requests.get(url, timeout=90)
+            elif method == "POST":
+                response = requests.post(url, json=data, timeout=90)
+            elif method == "PUT":
+                response = requests.put(url, json=data, timeout=90)
+            else:
+                st.error(f"Unsupported HTTP method: {method}")
+                return None
+            
+            # Check HTTP status
+            response.raise_for_status()
+            
+            # Try to parse JSON
+            try:
+                return response.json()
+            except json.JSONDecodeError:
+                st.error(f"❌ Backend returned invalid JSON")
+                st.error(f"Status Code: {response.status_code}")
+                with st.expander("View Response Details"):
+                    st.code(response.text[:1000])
+                return None
+        
+        except requests.exceptions.ConnectionError as e:
+            if attempt < max_retries - 1:
+                st.warning(f"🔄 Connection failed (attempt {attempt + 1}/{max_retries}). Retrying...")
+                continue
+            st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
+            st.info("🔄 The backend server might be starting up (cold start). Please wait and click the '🔄 Refresh Data' button in the sidebar.")
+            with st.expander("Connection Details"):
+                st.code(str(e))
+            return None
+        
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                st.warning(f"⏱️ Timeout (attempt {attempt + 1}/{max_retries}). Retrying with longer wait...")
+                continue
+            st.error("⏱️ Request timed out - backend is very slow")
+            st.info("💡 Free tier backends can take 60-90 seconds to wake up. Please use the '🔄 Refresh Data' button and try again.")
+            return None
+        
+        except requests.exceptions.HTTPError as e:
+            st.error(f"❌ HTTP Error {e.response.status_code}")
+            with st.expander("Error Details"):
+                st.code(e.response.text[:1000])
+            return None
+        
+        except requests.exceptions.RequestException as e:
+            st.error(f"❌ Request failed: {str(e)}")
             return None
     
-    except requests.exceptions.ConnectionError as e:
-        st.error(f"❌ Cannot connect to backend at {BACKEND_URL}")
-        st.info("🔄 The backend server might be starting up (cold start). Please wait 30-60 seconds and try again.")
-        with st.expander("Connection Details"):
-            st.code(str(e))
-        return None
-    
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Request timed out - backend is slow to respond")
-        st.info("💡 Free tier backends can take 30+ seconds to wake up. Please try again.")
-        return None
-    
-    except requests.exceptions.HTTPError as e:
-        st.error(f"❌ HTTP Error {e.response.status_code}")
-        with st.expander("Error Details"):
-            st.code(e.response.text[:1000])
-        return None
-    
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Request failed: {str(e)}")
-        return None
+    return None
 
 def display_menu():
     """Display the restaurant menu"""
