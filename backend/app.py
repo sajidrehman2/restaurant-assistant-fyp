@@ -24,30 +24,6 @@ def is_admin_command(text: str) -> bool:
     text_lower = text.lower()
     return any(keyword in text_lower for keyword in ADMIN_KEYWORDS)
 
-def create_status_notification(order_id: str, old_status: str, new_status: str, order_data: dict) -> dict:
-    """Create a notification message for order status change"""
-    notifications = {
-        "Pending": f"Your order #{order_id} has been received and is pending confirmation.",
-        "Confirmed": f"Great news! Your order #{order_id} has been confirmed and will be prepared shortly.",
-        "Preparing": f"Your order #{order_id} is now being prepared by our kitchen staff.",
-        "Ready": f"Your order #{order_id} is ready for pickup/delivery!",
-        "Delivered": f"Your order #{order_id} has been delivered. Enjoy your meal!",
-        "Cancelled": f"Your order #{order_id} has been cancelled."
-    }
-    
-    notification = {
-        "order_id": order_id,
-        "old_status": old_status,
-        "new_status": new_status,
-        "message": notifications.get(new_status, f"Your order #{order_id} status has been updated to {new_status}."),
-        "order_total": order_data.get('total_price', 0),
-        "items_count": len(order_data.get('items', [])),
-        "timestamp": datetime.datetime.now(datetime.UTC),
-        "read": False
-    }
-    
-    return notification
-
 @app.route('/')
 def index():
     """Health check endpoint"""
@@ -354,11 +330,11 @@ def place_order():
                     "response": "I couldn't retrieve your orders right now. Please try again or contact staff."
                 }), 200
         
-        # Enhanced clarification for generic items
+        # ============ FIX: Enhanced clarification for generic items ============
         elif parsed.get('needs_clarification', False):
             clarification_type = parsed['clarification_type']
             
-            # Handle unclear items
+            # Handle unclear items (NEW)
             if clarification_type == "unclear_items":
                 unclear = parsed.get('unclear_items', [])
                 response_text = f"I couldn't identify these items: {', '.join(unclear)}.\n\n"
@@ -375,7 +351,7 @@ def place_order():
                     "unclear_items": unclear
                 }), 200
             
-            # Handle generic items
+            # Handle generic items (e.g., "pizza" without type)
             available_options = parsed['available_options']
             quantity = parsed['quantities'][0] if parsed['quantities'] else 1
             
@@ -401,6 +377,7 @@ def place_order():
         
         # Handle food ordering
         elif parsed['intent'] == 'order_food':
+            # ============ FIX PROBLEM 4: Partial order processing ============
             unclear_items = parsed.get('unclear_items', [])
             
             # Check if we have ANY valid items
@@ -412,7 +389,7 @@ def place_order():
             
             # Process valid items even if some are unclear
             if parsed['items']:
-                # Build order items
+                # Build order items - quantities already aggregated by NLP
                 order_items = []
                 total_price = 0
                 quantities = parsed['quantities']
@@ -447,6 +424,7 @@ def place_order():
                         not_found_items.append(item_name)
                 
                 if not order_items:
+                    # ============ FIX PROBLEM 3: Better error message ============
                     error_msg = "I couldn't match any items to our menu."
                     if unclear_items:
                         error_msg += f" Unclear items: {', '.join(unclear_items)}."
@@ -520,6 +498,7 @@ def place_order():
                         response_message += f"• {item['quantity']}x {item['name']} - PKR {item['total_price']}\n"
                     response_message += f"\nTotal: PKR {total_price}"
                     
+                    # ============ FIX PROBLEM 4: Inform about unclear items ============
                     if unclear_items:
                         response_message += f"\n\n⚠️ Note: I couldn't identify these items: {', '.join(unclear_items)}. They were not included in your order."
                     
@@ -544,7 +523,7 @@ def place_order():
                     "intent": parsed['intent'],
                     "order": order_doc,
                     "response": response_message,
-                    "unclear_items": unclear_items
+                    "unclear_items": unclear_items  # Include for frontend awareness
                 }), 201
             
             else:
@@ -643,18 +622,10 @@ def get_order(order_id):
 
 @app.route('/orders/<order_id>/status', methods=['PUT'])
 def update_order_status(order_id):
-    """Update order status (Admin only) and send notification to user"""
+    """Update order status"""
     try:
         data = request.json
         new_status = data.get('status')
-        is_admin = data.get('is_admin', False)
-        
-        # Check if admin
-        if not is_admin:
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized. Only admin can update order status."
-            }), 403
         
         if not new_status:
             return jsonify({
@@ -669,42 +640,14 @@ def update_order_status(order_id):
                 "error": f"Invalid status. Valid statuses: {valid_statuses}"
             }), 400
         
-        # Get current order
-        doc = db.collection('orders').document(order_id).get()
-        
-        if not doc.exists:
-            return jsonify({
-                "success": False,
-                "error": "Order not found"
-            }), 404
-        
-        order_data = doc.to_dict()
-        old_status = order_data.get('status', 'Unknown')
-        
-        # Update order status
         db.collection('orders').document(order_id).update({
             'status': new_status,
             'updated_at': datetime.datetime.now(datetime.UTC)
         })
         
-        # Create notification for user
-        notification = create_status_notification(order_id, old_status, new_status, order_data)
-        
-        # Save notification to database
-        try:
-            db.collection('notifications').add(notification)
-            logger.info(f"Notification created for order {order_id}: {old_status} -> {new_status}")
-        except Exception as notif_error:
-            logger.error(f"Failed to create notification: {notif_error}")
-        
         return jsonify({
             "success": True,
-            "message": f"Order {order_id} status updated to {new_status}",
-            "notification": {
-                "message": notification["message"],
-                "new_status": new_status,
-                "old_status": old_status
-            }
+            "message": f"Order {order_id} status updated to {new_status}"
         }), 200
     
     except Exception as e:
@@ -712,61 +655,6 @@ def update_order_status(order_id):
         return jsonify({
             "success": False,
             "error": "Failed to update order status"
-        }), 500
-
-@app.route('/notifications', methods=['GET'])
-def get_notifications():
-    """Get user notifications"""
-    try:
-        limit = request.args.get('limit', 20, type=int)
-        unread_only = request.args.get('unread_only', 'false').lower() == 'true'
-        
-        query = db.collection('notifications').order_by('timestamp', direction='DESCENDING').limit(limit)
-        
-        if unread_only:
-            query = query.where('read', '==', False)
-        
-        docs = query.stream()
-        notifications = []
-        for doc in docs:
-            notif = doc.to_dict()
-            notif['doc_id'] = doc.id
-            # Convert timestamp
-            if 'timestamp' in notif:
-                notif['timestamp'] = notif['timestamp'].isoformat() if hasattr(notif['timestamp'], 'isoformat') else str(notif['timestamp'])
-            notifications.append(notif)
-        
-        return jsonify({
-            "success": True,
-            "notifications": notifications,
-            "count": len(notifications)
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Error fetching notifications: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Failed to fetch notifications"
-        }), 500
-
-@app.route('/notifications/<notif_id>/read', methods=['PUT'])
-def mark_notification_read(notif_id):
-    """Mark notification as read"""
-    try:
-        db.collection('notifications').document(notif_id).update({
-            'read': True
-        })
-        
-        return jsonify({
-            "success": True,
-            "message": "Notification marked as read"
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Error marking notification as read: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Failed to mark notification as read"
         }), 500
 
 @app.route('/chat/<order_id>', methods=['GET'])

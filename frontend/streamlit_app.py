@@ -26,14 +26,6 @@ except Exception:
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 
-# Initialize admin state
-if "is_admin" not in st.session_state:
-    st.session_state.is_admin = False
-
-# Initialize notifications check
-if "last_notification_check" not in st.session_state:
-    st.session_state.last_notification_check = datetime.now()
-
 # Premium Modern CSS with Dual Theme Support
 st.markdown("""
 <style>
@@ -138,37 +130,6 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(16px);
         border: 1px solid rgba(203, 213, 225, 0.4);
-    }
-    
-    /* Notification Badge */
-    .notification-badge {
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        color: white;
-        padding: 0.3rem 0.7rem;
-        border-radius: 50px;
-        font-size: 0.75em;
-        font-weight: 700;
-        margin-left: 0.5rem;
-        animation: pulse 2s infinite;
-    }
-    
-    .notification-card {
-        background: rgba(59, 130, 246, 0.1);
-        border-left: 4px solid #3b82f6;
-        padding: 1rem 1.5rem;
-        margin: 0.8rem 0;
-        border-radius: 12px;
-        transition: all 0.3s ease;
-    }
-    
-    .notification-card:hover {
-        background: rgba(59, 130, 246, 0.15);
-        transform: translateX(5px);
-    }
-    
-    .notification-unread {
-        border-left-color: #ef4444;
-        background: rgba(239, 68, 68, 0.1);
     }
     
     /* Header */
@@ -655,6 +616,7 @@ st.markdown("""
     
     /* Mobile Responsive Design */
     @media screen and (max-width: 768px) {
+        /* Header adjustments */
         .premium-header {
             padding: 1.5rem;
             flex-direction: column;
@@ -682,6 +644,7 @@ st.markdown("""
             margin-top: 1rem;
         }
         
+        /* Menu items - single column on mobile */
         .menu-item {
             padding: 1.2rem;
             margin: 0.8rem 0;
@@ -700,11 +663,13 @@ st.markdown("""
             padding: 0.5rem 1.2rem;
         }
         
+        /* Chat messages */
         .chat-user, .chat-bot {
             padding: 0.8rem 1rem;
             font-size: 0.9em;
         }
         
+        /* Metric cards - stack on mobile */
         .metric-card {
             padding: 1.5rem;
             margin: 0.8rem 0;
@@ -718,11 +683,13 @@ st.markdown("""
             font-size: 0.9em;
         }
         
+        /* Buttons */
         .stButton > button {
             padding: 0.7rem 1.5rem;
             font-size: 0.9em;
         }
         
+        /* Order cards */
         .order-card {
             padding: 1.2rem;
         }
@@ -732,6 +699,7 @@ st.markdown("""
             font-size: 0.9em;
         }
         
+        /* Theme toggle button */
         .theme-toggle {
             bottom: 1rem;
             right: 1rem;
@@ -740,16 +708,19 @@ st.markdown("""
             font-size: 1.2em;
         }
         
+        /* Footer */
         .footer {
             font-size: 0.8em;
             padding: 1.5rem 1rem;
         }
         
+        /* Status badges */
         .status-badge {
             font-size: 0.8em;
             padding: 0.5rem 1rem;
         }
         
+        /* Input fields */
         .stTextInput > div > div > input,
         .stChatInput > div > input {
             font-size: 0.9em;
@@ -757,6 +728,7 @@ st.markdown("""
         }
     }
     
+    /* Extra small mobile devices */
     @media screen and (max-width: 480px) {
         .header-text h1 {
             font-size: 1.3em;
@@ -787,6 +759,7 @@ def make_request(endpoint, method="GET", data=None, max_retries=2):
     
     for attempt in range(max_retries):
         try:
+            # Longer timeout for free tier backends (90 seconds)
             if method == "GET":
                 response = requests.get(url, timeout=90)
             elif method == "POST":
@@ -797,8 +770,10 @@ def make_request(endpoint, method="GET", data=None, max_retries=2):
                 st.error(f"Unsupported HTTP method: {method}")
                 return None
             
+            # Check HTTP status
             response.raise_for_status()
             
+            # Try to parse JSON
             try:
                 return response.json()
             except json.JSONDecodeError:
@@ -837,70 +812,6 @@ def make_request(endpoint, method="GET", data=None, max_retries=2):
             return None
     
     return None
-
-def get_notifications():
-    """Fetch user notifications"""
-    try:
-        notif_data = make_request("notifications?limit=10&unread_only=false")
-        if notif_data and notif_data.get("success"):
-            return notif_data.get("notifications", [])
-        return []
-    except Exception as e:
-        return []
-
-def display_notifications():
-    """Display notifications page"""
-    st.markdown("## <span class='icon'>🔔</span> Notifications", unsafe_allow_html=True)
-    
-    with st.spinner("Loading notifications..."):
-        notifications = get_notifications()
-    
-    if not notifications:
-        st.info("📭 No notifications yet. You'll be notified when your order status changes!")
-        return
-    
-    unread_count = sum(1 for n in notifications if not n.get('read', False))
-    
-    if unread_count > 0:
-        st.markdown(f"### You have {unread_count} unread notification{'s' if unread_count != 1 else ''}")
-    
-    for notif in notifications:
-        is_unread = not notif.get('read', False)
-        card_class = "notification-card notification-unread" if is_unread else "notification-card"
-        
-        timestamp = notif.get('timestamp', 'Unknown')
-        if isinstance(timestamp, str):
-            try:
-                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                timestamp = dt.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                pass
-        
-        status_badge_class = f"status-{notif.get('new_status', 'pending').lower()}"
-        
-        st.markdown(f"""
-        <div class="{card_class}">
-            <div style="display: flex; justify-content: space-between; align-items: start;">
-                <div style="flex: 1;">
-                    <h4 style="margin: 0 0 0.5rem 0;">{'🔴 ' if is_unread else ''}Order Status Update</h4>
-                    <p style="margin: 0.5rem 0; font-size: 1.1em; font-weight: 500;">{notif.get('message', 'Status updated')}</p>
-                    <p style="margin: 0.5rem 0; opacity: 0.7; font-size: 0.9em;">
-                        <strong>Order ID:</strong> {notif.get('order_id', 'Unknown')[:25]}...<br>
-                        <strong>Total:</strong> PKR {notif.get('order_total', 0)} • <strong>Items:</strong> {notif.get('items_count', 0)}<br>
-                        <strong>Status:</strong> <span class="status-badge {status_badge_class}">{notif.get('new_status', 'Unknown')}</span>
-                    </p>
-                    <p style="margin: 0.5rem 0 0 0; opacity: 0.5; font-size: 0.85em;">🕐 {timestamp}</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if is_unread:
-            if st.button("Mark as Read", key=f"read_{notif.get('doc_id')}", use_container_width=True):
-                result = make_request(f"notifications/{notif.get('doc_id')}/read", "PUT")
-                if result and result.get("success"):
-                    st.success("✓ Marked as read")
-                    st.rerun()
 
 def display_menu():
     """Display the restaurant menu"""
@@ -951,12 +862,8 @@ def display_menu():
         st.warning("⚠️ Could not load menu. Please check the System Status page or try again later.")
 
 def display_orders():
-    """Display order history with admin controls"""
+    """Display order history"""
     st.markdown("## <span class='icon'>📋</span> Order History", unsafe_allow_html=True)
-    
-    # Show admin status
-    if st.session_state.is_admin:
-        st.success("🔑 Admin Mode: You can update order statuses")
     
     with st.spinner("Loading orders..."):
         orders_data = make_request("orders?limit=20")
@@ -1003,39 +910,26 @@ def display_orders():
                 
                 st.markdown("---")
                 
-                # Admin-only status update section
-                if st.session_state.is_admin:
-                    st.markdown("### 🔑 Admin: Update Order Status")
-                    
-                    col_status1, col_status2 = st.columns([3, 1])
-                    
-                    with col_status1:
-                        new_status = st.selectbox(
-                            "Update Status:",
-                            ["Pending", "Confirmed", "Preparing", "Ready", "Delivered", "Cancelled"],
-                            index=["Pending", "Confirmed", "Preparing", "Ready", "Delivered", "Cancelled"].index(order.get('status', 'Pending')),
-                            key=f"status_{order.get('order_id')}"
-                        )
-                    
-                    with col_status2:
-                        if st.button("Update", key=f"update_{order.get('order_id')}", use_container_width=True):
-                            update_data = {
-                                "status": new_status,
-                                "is_admin": True
-                            }
-                            result = make_request(f"orders/{order.get('order_id')}/status", "PUT", update_data)
-                            
-                            if result and result.get("success"):
-                                st.success(f"✓ Status updated to {new_status}")
-                                notification_msg = result.get('notification', {}).get('message', '')
-                                if notification_msg:
-                                    st.info(f"📬 Notification sent: {notification_msg}")
-                                st.rerun()
-                            else:
-                                error_msg = result.get('error', 'Failed to update status') if result else 'Request failed'
-                                st.error(f"❌ {error_msg}")
-                else:
-                    st.info("ℹ️ Only admin can update order status. Login as admin to make changes.")
+                col_status1, col_status2 = st.columns([3, 1])
+                
+                with col_status1:
+                    new_status = st.selectbox(
+                        "Update Status:",
+                        ["Pending", "Confirmed", "Preparing", "Ready", "Delivered", "Cancelled"],
+                        index=["Pending", "Confirmed", "Preparing", "Ready", "Delivered", "Cancelled"].index(order.get('status', 'Pending')),
+                        key=f"status_{order.get('order_id')}"
+                    )
+                
+                with col_status2:
+                    if st.button("Update", key=f"update_{order.get('order_id')}", use_container_width=True):
+                        update_data = {"status": new_status}
+                        result = make_request(f"orders/{order.get('order_id')}/status", "PUT", update_data)
+                        
+                        if result and result.get("success"):
+                            st.success(f"Status updated to {new_status}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to update status")
     else:
         st.warning("⚠️ Could not load orders. Please check the System Status page or try again later.")
 
@@ -1228,10 +1122,6 @@ def main():
     health_data = make_request("health")
     is_online = health_data is not None
     
-    # Get unread notifications count
-    notifications = get_notifications()
-    unread_count = sum(1 for n in notifications if not n.get('read', False))
-    
     st.markdown(f"""
     <div class="premium-header">
         <div class="header-content">
@@ -1249,48 +1139,29 @@ def main():
     """, unsafe_allow_html=True)
     
     st.sidebar.title("🎯 Navigation")
-    
-    # Build navigation with notification badge
-    nav_options = [
-        "💬 Chat & Order", 
-        "🍽️ View Menu", 
-        "📋 Order History",
-        f"🔔 Notifications{' (' + str(unread_count) + ')' if unread_count > 0 else ''}",
-        "🔧 System Status"
-    ]
-    
     page = st.sidebar.radio(
         "Navigation Menu",
-        nav_options,
-        index=nav_options.index(st.session_state.page) if st.session_state.page in nav_options else 0,
+        [
+            "💬 Chat & Order", 
+            "🍽️ View Menu", 
+            "📋 Order History",
+            "🔧 System Status"
+        ],
+        index=[
+            "💬 Chat & Order", 
+            "🍽️ View Menu", 
+            "📋 Order History",
+            "🔧 System Status"
+        ].index(st.session_state.page) if st.session_state.page in [
+            "💬 Chat & Order", 
+            "🍽️ View Menu", 
+            "📋 Order History",
+            "🔧 System Status"
+        ] else 0,
         label_visibility="collapsed"
     )
     
-    # Clean up page selection (remove notification count)
-    if "Notifications" in page:
-        page = "🔔 Notifications"
-    
     st.session_state.page = page
-    
-    st.sidebar.markdown("---")
-    
-    # Admin login section
-    st.sidebar.subheader("🔑 Admin Access")
-    if not st.session_state.is_admin:
-        admin_password = st.sidebar.text_input("Admin Password", type="password", key="admin_pwd")
-        if st.sidebar.button("Login as Admin", use_container_width=True):
-            # Simple password check (in production, use proper authentication)
-            if admin_password == "admin123":  # Change this to your secure password
-                st.session_state.is_admin = True
-                st.sidebar.success("✓ Logged in as Admin")
-                st.rerun()
-            else:
-                st.sidebar.error("✗ Invalid password")
-    else:
-        st.sidebar.success("✓ Logged in as Admin")
-        if st.sidebar.button("Logout", use_container_width=True):
-            st.session_state.is_admin = False
-            st.rerun()
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("🎨 Theme")
@@ -1313,11 +1184,9 @@ def main():
     st.sidebar.subheader("⚡ Quick Actions")
     
     if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
-        admin_status = st.session_state.is_admin
         st.session_state.clear()
         st.session_state.theme = "dark"
         st.session_state.page = "💬 Chat & Order"
-        st.session_state.is_admin = admin_status
         st.rerun()
     
     if st.sidebar.button("🗑️ Clear Chat", use_container_width=True):
@@ -1363,8 +1232,6 @@ def main():
         display_menu()
     elif page == "📋 Order History":
         display_orders()
-    elif page == "🔔 Notifications":
-        display_notifications()
     elif page == "🔧 System Status":
         system_status()
     
